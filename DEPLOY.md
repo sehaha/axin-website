@@ -79,8 +79,10 @@ V5 是编译型应用，改完必须**重新 build 镜像 + 重启容器**才生
 配置：Server A 上 `/opt/axin-website/.env.prod`（权限 600，不进仓库）
 
 ```
-FORMSPREE_ENDPOINT=https://formspree.io/f/xxxxxxxx
+FORMSPREE_ENDPOINT=https://formspree.io/f/mppagwqe
 ```
+
+**已于 2026-08-24 接通并线上验证通过。**
 
 容器启动时用 `--env-file /opt/axin-website/.env.prod` 注入。**改了这个文件必须重启容器才生效。**
 
