@@ -65,29 +65,50 @@ V5 是编译型应用，改完必须**重新 build 镜像 + 重启容器**才生
 
 改完如果 Cloudflare 缓存了旧版，去 CF 后台 Purge。
 
+## 联系表单（Formspree）
+
+`POST /api/contact` 校验字段后转发到 **Formspree**。链路：
+
+```
+浏览器 → /api/contact（同源，服务端）→ Formspree
+```
+
+走服务端中转而不是让前端直接 POST 到 Formspree，好处是表单 ID 不暴露在前端代码里，
+且校验和蜜罐都在服务端执行。
+
+配置：Server A 上 `/opt/axin-website/.env.prod`（权限 600，不进仓库）
+
+```
+FORMSPREE_ENDPOINT=https://formspree.io/f/xxxxxxxx
+```
+
+容器启动时用 `--env-file /opt/axin-website/.env.prod` 注入。**改了这个文件必须重启容器才生效。**
+
+几个实现上的要点：
+
+- 请求必须带 `Accept: application/json`，否则 Formspree 返回 302 跳它自家致谢页，拿不到 JSON
+- `_subject` 字段让邮件主题带上来意（`AXIN website enquiry — <intent>`），收件箱里好分辨
+- `_gotcha` 是蜜罐字段，前端藏在屏幕外且 `tabIndex={-1}`，真人填不到；有值就静默返回成功，不给爬虫反馈
+- Formspree 报错时把具体原因写进服务端日志（`docker logs axin-website`），
+  前端只显示笼统提示。表单未激活、超额度这类问题靠这个日志排查
+
+**没配 `FORMSPREE_ENDPOINT` 时接口返回 503**，前端显示 "Contact routing is not configured yet"。
+这是有意为之——宁可报错也不静默丢线索。
+
 ## 待办
 
-### 1. 联系表单还没接通（当前返回 503）
-
-`POST /api/contact` 会校验字段然后转发到 `CONTACT_WEBHOOK_URL`，
-这个环境变量没配，所以现在提交表单会收到"Contact routing is not configured yet"。
-这是源码有意为之——宁可报错也不静默丢线索。
-
-接通方式：在 Server A 建 `/opt/axin-website/.env.prod` 写入
-`CONTACT_WEBHOOK_URL=https://...`（HubSpot / Zapier / 自建接口都行），
-然后启动容器时加 `--env-file /opt/axin-website/.env.prod`。
-
-### 2. 确认 Cloudflare SSL 模式是 Full (strict)
+### 确认 Cloudflare SSL 模式是 Full (strict)
 
 源站现在有合法的 Let's Encrypt 证书，可以安全地开 Full (strict)。
-线上实测没有重定向循环，说明当前至少是 Full 而非 Flexible，但 Full 不校验源站证书，
-建议去 CF 后台确认调到 **Full (strict)**。
-（服务器上那个 CF token 只有 DNS 权限，改不了这个设置，只能后台点。）
+线上实测没有重定向循环，说明当前至少是 Full 而非 Flexible，但 Full 不校验源站证书。
 
-### 3. 关掉 GitHub Pages
+服务器上 `credentials-1` 里那个 CF token **只有 DNS 权限**，读不了也改不了 Zone Settings。
+要用 API 改的话，得让那个 token 补上 `Zone → Zone Settings → Edit`。
 
-仓库还开着 Pages（`https://sehaha.github.io/axin-website/`），是 V4 时期用来快速预览的，
-现在内容已经不是最新版。正式域名已上线，建议关掉，避免同一份内容有两个可索引的地址。
+## 已完成
+
+- GitHub Pages 已于 2026-08-24 关闭（原 `https://sehaha.github.io/axin-website/`），
+  避免同一份内容有两个可索引地址。仓库保留，只是不再发布。
 
 ## 备注：NPM 的操作方式
 
