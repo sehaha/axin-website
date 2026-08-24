@@ -1,7 +1,9 @@
 node_modules
 .next
+.git
 .env*
 !.env.example
-.vercel
-.DS_Store
 *.zip
+.DS_Store
+DEPLOY.md
+README.md
