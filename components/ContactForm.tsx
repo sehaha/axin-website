@@ -12,8 +12,10 @@ export function ContactForm() {
     event.preventDefault();
     setState("sending");
     setMessage("");
-    const form = new FormData(event.currentTarget);
-    const payload = Object.fromEntries(form.entries());
+    // 先抓住表单引用：await 之后 event.currentTarget 会变成 null，
+    // 直接在那时候调 reset() 会抛错，把成功的提交也带进 catch 里报错。
+    const formEl = event.currentTarget;
+    const payload = Object.fromEntries(new FormData(formEl).entries());
 
     try {
       const response = await fetch("/api/contact", {
@@ -23,7 +25,7 @@ export function ContactForm() {
       });
       const result = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(result.error || "Unable to submit.");
-      event.currentTarget.reset();
+      formEl.reset();
       setState("success");
       setMessage("Thank you. Our team will follow up shortly.");
     } catch (error) {
@@ -53,6 +55,15 @@ export function ContactForm() {
         </select>
       </label>
       <label><span>Message</span><textarea name="message" rows={4} maxLength={3000} /></label>
+      {/* 蜜罐：屏幕阅读器和键盘都跳过，只有机器人会填 */}
+      <input
+        type="text"
+        name="_gotcha"
+        tabIndex={-1}
+        autoComplete="off"
+        aria-hidden="true"
+        style={{ position: "absolute", left: "-9999px", width: 1, height: 1 }}
+      />
       <div className="form-footer">
         <button type="submit" disabled={state === "sending"}>{state === "sending" ? "Sending…" : "Start a Conversation"}<span aria-hidden="true">↗</span></button>
         <p className={`form-status ${state}`} aria-live="polite">{message}</p>
