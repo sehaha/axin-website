@@ -11,6 +11,35 @@ const engines = [
 
 const stages = ["Learn", "Build", "Deploy", "Commercialize"];
 
+// 生态板块的四家实体，各自链到独立站点。eduready.ai 的 www 会 301 到根域，
+// 这里直接写最终地址，省掉一次跳转。
+const units = [
+  {
+    position: "unit-a",
+    category: "TECHNOLOGY",
+    name: "AXIN Intelligent Systems",
+    href: "https://eduready.ai/",
+  },
+  {
+    position: "unit-b",
+    category: "GLOBAL SERVICES",
+    name: "YUNO Family Office",
+    href: "https://www.yunofamilyoffice.com/",
+  },
+  {
+    position: "unit-c",
+    category: "CAPITAL",
+    name: "METO Capital",
+    href: "https://www.metocapital.com/",
+  },
+  {
+    position: "unit-d",
+    category: "EDUCATION & TALENT",
+    name: "Aili Academy",
+    href: "https://www.ailiacademy.com/",
+  },
+] as const;
+
 export default function Home() {
   return (
     <main>
@@ -107,10 +136,20 @@ export default function Home() {
             <div className="ring ring-one" aria-hidden="true" />
             <div className="ring ring-two" aria-hidden="true" />
             <div className="ecosystem-center">AXIN</div>
-            <div className="unit unit-a"><small>TECHNOLOGY</small><strong>AXIN Intelligent Systems</strong></div>
-            <div className="unit unit-b"><small>GLOBAL SERVICES</small><strong>YUNO Family Office</strong></div>
-            <div className="unit unit-c"><small>CAPITAL</small><strong>METO Capital</strong></div>
-            <div className="unit unit-d"><small>EDUCATION & TALENT</small><strong>Aili Academy</strong></div>
+            {units.map(unit => (
+              <a
+                key={unit.position}
+                className={`unit ${unit.position}`}
+                href={unit.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${unit.name} — ${unit.category}, opens in a new tab`}
+              >
+                <small>{unit.category}</small>
+                <strong>{unit.name}</strong>
+                <span className="unit-go" aria-hidden="true">↗</span>
+              </a>
+            ))}
           </div>
         </div>
       </section>
