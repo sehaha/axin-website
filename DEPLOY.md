@@ -2,6 +2,7 @@
 
 > 生产仓库：`sehaha/axin-website` 的 **main** 分支。
 > 生产服务器：**Server A (173.249.200.219)**，与 wanneng.app 同机，NPM 反代在最前面。
+> 状态：**已上线**（2026-08-24），https://axin.group
 
 ## 域名策略
 
@@ -10,95 +11,89 @@
 理由：`.group` 这个 TLD 本身就承载了"集团"的含义，`axin.group` 读起来是完整的一句品牌名，
 前面再加 `www.` 纯属冗余。传统上把 www 当主域的两个理由在这里都不成立——
 Cloudflare 支持根域 CNAME flattening，不存在根域无法接 CDN 的问题；
-本站是纯静态页面、不写 cookie，也不存在 cookie 泄漏到子域的顾虑。
+本站不写 cookie，也不存在 cookie 泄漏到子域的顾虑。
 
-不要让两个域名同时返回 200（会产生重复内容），统一 301 收敛到根域。
+两个域名不同时返回 200，统一 301 收敛到根域，避免重复内容。
+`lib/site.ts` 里的 `site.url` 必须跟这个策略一致（它同时喂给 canonical、OG、sitemap、robots）。
+**V5 源码原本写的是 `https://www.axin.group`，已改为根域。以后合并上游改动时注意别被改回去。**
 
 ## 生产架构
 
 | 组件 | 容器名 | 端口 | 入口 |
 |------|--------|------|------|
-| AXIN 官网静态站 | `axin-website` | 4003 | `axin.group`（经 NPM 反代） |
+| AXIN 官网（Next.js SSR） | `axin-website` | 4003 | `axin.group`（经 NPM 反代） |
 
-- 站点文件：Server A 上 `/opt/axin-website`（就是本仓库的 clone）
-- 容器：`nginx:alpine`，把 `/opt/axin-website` 只读挂到 `/usr/share/nginx/html`
-- 端口分配沿用本机静态站惯例：4000 wanneng-landing / 4001 tuancan-h5 / 4002 icross-arcfe / **4003 axin-website**
+V5 起站点是 **Next.js App Router 应用**（不是静态页），带 `/api/contact` 服务端路由，
+所以必须跑 Node 进程，不能像 V4 那样用 nginx 挂静态文件。
 
-容器创建命令（已执行，仅作记录）：
-
-```bash
-docker run -d --name axin-website --restart always \
-  -p 4003:80 \
-  -v /opt/axin-website:/usr/share/nginx/html:ro \
-  nginx:alpine
-```
+- 代码：Server A 上 `/opt/axin-website`（本仓库的 clone）
+- 镜像：`axin-website:latest`，多阶段构建，产物是 Next.js `output: "standalone"`
+- 容器：`-p 4003:3000`，`--restart always`
+- 端口沿用本机静态站惯例：4000 wanneng-landing / 4001 tuancan-h5 / 4002 icross-arcfe / **4003 axin-website**
 
 ## DNS（Cloudflare，zone `axin.group`）
 
 | 类型 | 名称 | 值 | 代理 |
 |------|------|-----|------|
-| A | `axin.group` | 173.249.200.219 | 已开启（橙云） |
-| A | `www.axin.group` | 173.249.200.219 | 已开启（橙云） |
+| A | `axin.group` | 173.249.200.219 | 橙云 |
+| A | `www.axin.group` | 173.249.200.219 | 橙云 |
 
-两条记录都已配好。
+NS 已从 Dynadot 切到 `crystal.ns.cloudflare.com` / `hank.ns.cloudflare.com`，zone 已 active。
 
-**注册商是 Dynadot，域名的 NS 还没切到 Cloudflare**，所以以上记录暂时不生效。
-需要在 Dynadot 后台把 axin.group 的 nameserver 改成：
+## NPM 配置（已建好）
 
-```
-crystal.ns.cloudflare.com
-hank.ns.cloudflare.com
-```
-
-（与 wanneng.app 用的是同一组，改完通常几分钟到几小时生效。）
-
-## NPM 配置
-
-需要建两个对象，都在 NPM 后台（`http://173.249.200.219:81`）：
-
-**1. Proxy Host —— 主域名**
-- Domain Names: `axin.group`
-- Scheme: `http`，Forward Hostname/IP: `172.17.0.1`，Forward Port: `4003`
-- 勾 Block Common Exploits、Websockets Support
-- SSL 标签页：`Request a new SSL Certificate`，**用 DNS Challenge，Provider 选 Cloudflare**
-  （沿用本机惯例，API token 已在 `/opt/docker-apps/gateway/letsencrypt/credentials/`）
-  域名同时填 `axin.group` 和 `www.axin.group`，一张证书覆盖两个
-- 勾 Force SSL、HTTP/2 Support
-
-**2. Redirection Host —— www 跳主域**
-- Domain Names: `www.axin.group`
-- Forward Domain: `axin.group`，Scheme `https`
-- HTTP Code: **301**，勾 Preserve Path
-- SSL 选上一步签好的那张证书，勾 Force SSL
-
-> DNS Challenge 必须等 NS 切换生效之后再做。Let's Encrypt 会去查域名的权威 NS，
-> 现在还是 Dynadot 的 parking NS，TXT 验证记录写在 Cloudflare 上它看不见，签发一定失败。
-
-## 上线顺序（有先后依赖，别跳）
-
-1. Dynadot 改 NS → 等 `dig NS axin.group` 返回 cloudflare 的两条
-2. Cloudflare zone 状态从 `pending` 变 `active`
-3. **先把 Cloudflare 的 SSL/TLS 模式设成 `Full (strict)`**
-4. NPM 建 Proxy Host + 签证书（DNS Challenge）
-5. NPM 建 Redirection Host
-6. 验证：`axin.group` 200、`www.axin.group` 301
-
-> ⚠️ 第 3 步不能省。如果 Cloudflare 停在 `Flexible` 模式（CF 用 HTTP 回源），
-> 而 NPM 那边勾了 Force SSL，会形成无限重定向循环，页面直接打不开。
-> 顺序是"先把回源改成 HTTPS，再开 Force SSL"。
+- **Proxy Host #3**：`axin.group` → `172.17.0.1:4003`，Force SSL、HTTP/2、Block Exploits、Websockets
+- **Redirection Host #1**：`www.axin.group` → `axin.group`，301，Preserve Path
+- **证书 #3**：Let's Encrypt，DNS-01（Cloudflare），一张覆盖 `axin.group` + `www.axin.group`，NPM 自动续期
 
 ## 更新站点
 
-改 `index.html`，push 到 main，然后：
+改代码 push 到 main，然后在 Server A 上重新构建镜像并重启容器：
 
 ```bash
-ssh -i ~/.ssh/wanneng_deploy root@173.249.200.219 'cd /opt/axin-website && git pull --ff-only'
+ssh -i ~/.ssh/wanneng_deploy root@173.249.200.219 '
+  cd /opt/axin-website &&
+  git fetch --depth 1 origin main -q && git reset --hard origin/main -q &&
+  docker build -t axin-website:latest . &&
+  docker rm -f axin-website &&
+  docker run -d --name axin-website --restart always -p 4003:3000 axin-website:latest
+'
 ```
 
-目录是只读挂载进容器的，`git pull` 完立刻生效，**不需要重启容器**。
-如果 Cloudflare 缓存了旧版，去 CF 后台 Purge 一下。
+**注意 V5 跟 V4 不一样**：V4 是挂载静态文件，`git pull` 就生效；
+V5 是编译型应用，改完必须**重新 build 镜像 + 重启容器**才生效。
 
-## 备注
+改完如果 Cloudflare 缓存了旧版，去 CF 后台 Purge。
 
-仓库同时开着 GitHub Pages（`https://sehaha.github.io/axin-website/`），当初用来快速预览。
-正式域名上线后建议关掉，避免同一份内容有两个可索引的地址。
+## 待办
+
+### 1. 联系表单还没接通（当前返回 503）
+
+`POST /api/contact` 会校验字段然后转发到 `CONTACT_WEBHOOK_URL`，
+这个环境变量没配，所以现在提交表单会收到"Contact routing is not configured yet"。
+这是源码有意为之——宁可报错也不静默丢线索。
+
+接通方式：在 Server A 建 `/opt/axin-website/.env.prod` 写入
+`CONTACT_WEBHOOK_URL=https://...`（HubSpot / Zapier / 自建接口都行），
+然后启动容器时加 `--env-file /opt/axin-website/.env.prod`。
+
+### 2. 确认 Cloudflare SSL 模式是 Full (strict)
+
+源站现在有合法的 Let's Encrypt 证书，可以安全地开 Full (strict)。
+线上实测没有重定向循环，说明当前至少是 Full 而非 Flexible，但 Full 不校验源站证书，
+建议去 CF 后台确认调到 **Full (strict)**。
+（服务器上那个 CF token 只有 DNS 权限，改不了这个设置，只能后台点。）
+
+### 3. 关掉 GitHub Pages
+
+仓库还开着 Pages（`https://sehaha.github.io/axin-website/`），是 V4 时期用来快速预览的，
+现在内容已经不是最新版。正式域名已上线，建议关掉，避免同一份内容有两个可索引的地址。
+
+## 备注：NPM 的操作方式
+
+服务器上没有存 NPM 管理员密码。本次配置是通过临时在 NPM 数据库里建一个管理员账号、
+调它的 REST API 完成的，做完已删除该账号，并把创建的证书/主机归属改回真实管理员（id=1）。
+操作前数据库备份在 `/opt/backups/npm-database-20260824-005414.sqlite`。
+
+以后再动 NPM，**优先直接用后台 UI**（`http://173.249.200.219:81`）——
+走 API 是因为当时拿不到密码，不是推荐做法。
