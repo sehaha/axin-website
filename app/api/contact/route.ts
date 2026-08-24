@@ -48,7 +48,7 @@ export async function POST(request: Request) {
         email,
         intent,
         message,
-        source: "axin.group",
+        source: "axingroup.com",
         submittedAt: new Date().toISOString(),
         // Formspree 用它做邮件主题，便于在收件箱里一眼分辨来意
         _subject: `AXIN website enquiry — ${intent}`,

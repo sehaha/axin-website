@@ -3,6 +3,6 @@ export const site = {
   shortName: "AXIN",
   description:
     "AXIN International Group is a U.S.-based technology and integrated services group connecting technology, capital, talent and global opportunity.",
-  url: "https://axin.group",
+  url: "https://axingroup.com",
   tagline: "Powering the Next Generation of Global Growth.",
 };
