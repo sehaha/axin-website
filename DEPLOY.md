@@ -31,7 +31,7 @@ canonical 会把权重指到一个 301 域名上，等于自己拆自己的台�
 
 | 组件 | 容器名 | 端口 | 入口 |
 |------|--------|------|------|
-| AXIN 官网（Next.js SSR） | `axin-website` | 4003 | `axin.group`（经 NPM 反代） |
+| AXIN 官网（Next.js SSR） | `axin-website` | 4003 | `axingroup.com`（经 NPM 反代） |
 
 V5 起站点是 **Next.js App Router 应用**（不是静态页），带 `/api/contact` 服务端路由，
 所以必须跑 Node 进程，不能像 V4 那样用 nginx 挂静态文件。
