@@ -2,20 +2,30 @@
 
 > 生产仓库：`sehaha/axin-website` 的 **main** 分支。
 > 生产服务器：**Server A (173.249.200.219)**，与 wanneng.app 同机，NPM 反代在最前面。
-> 状态：**已上线**（2026-08-24），https://axin.group
+> 状态：**已上线**，https://axingroup.com
 
 ## 域名策略
 
-**主域名 `axin.group`，`www.axin.group` 301 跳到主域名。**
+**主域名 `axingroup.com`（根域），其余全部 301 收敛过去。**（2026-08-24 由 axin.group 切换而来）
 
-理由：`.group` 这个 TLD 本身就承载了"集团"的含义，`axin.group` 读起来是完整的一句品牌名，
-前面再加 `www.` 纯属冗余。传统上把 www 当主域的两个理由在这里都不成立——
-Cloudflare 支持根域 CNAME flattening，不存在根域无法接 CDN 的问题；
-本站不写 cookie，也不存在 cookie 泄漏到子域的顾虑。
+| 域名 | 行为 |
+|------|------|
+| `axingroup.com` | **主站**，返回 200 |
+| `www.axingroup.com` | 301 → `axingroup.com` |
+| `axin.group` | 301 → `axingroup.com` |
+| `www.axin.group` | 301 → `axingroup.com` |
 
-两个域名不同时返回 200，统一 301 收敛到根域，避免重复内容。
-`lib/site.ts` 里的 `site.url` 必须跟这个策略一致（它同时喂给 canonical、OG、sitemap、robots）。
-**V5 源码原本写的是 `https://www.axin.group`，已改为根域。以后合并上游改动时注意别被改回去。**
+一律用根域而非 www：Cloudflare 支持根域 CNAME flattening，不存在根域接不了 CDN 的问题；
+本站不写 cookie，也没有 cookie 泄漏到子域的顾虑。
+
+**四个入口都是单跳直达，不做链式跳转。** 特别注意 `www.axin.group` 是直接指向
+`axingroup.com`，而不是先跳 `axin.group` 再跳一次——每多一跳都会稀释一次权重传递。
+（唯一的两跳是 `http://axin.group`，因为 Cloudflare 边缘会先把 http 升级成 https，
+这一跳发生在回源之前，改不掉也无所谓。）
+
+`lib/site.ts` 里的 `site.url` 必须跟主域一致，它同时喂给 canonical、OG、sitemap、robots。
+**V5 源码原本写的是 `https://www.axin.group`；改主域时这个值必须一起改，否则
+canonical 会把权重指到一个 301 域名上，等于自己拆自己的台。**
 
 ## 生产架构
 
@@ -31,20 +41,35 @@ V5 起站点是 **Next.js App Router 应用**（不是静态页），带 `/api/c
 - 容器：`-p 4003:3000`，`--restart always`
 - 端口沿用本机静态站惯例：4000 wanneng-landing / 4001 tuancan-h5 / 4002 icross-arcfe / **4003 axin-website**
 
-## DNS（Cloudflare，zone `axin.group`）
+## DNS（Cloudflare）
 
-| 类型 | 名称 | 值 | 代理 |
+两个 zone 都已 active，NS 均为 `crystal.ns.cloudflare.com` / `hank.ns.cloudflare.com`。
+
+| zone | 记录 | 值 | 代理 |
 |------|------|-----|------|
-| A | `axin.group` | 173.249.200.219 | 橙云 |
-| A | `www.axin.group` | 173.249.200.219 | 橙云 |
+| axingroup.com | A `axingroup.com` | 173.249.200.219 | 橙云 |
+| axingroup.com | A `www.axingroup.com` | 173.249.200.219 | 橙云 |
+| axin.group | A `axin.group` | 173.249.200.219 | 橙云 |
+| axin.group | A `www.axin.group` | 173.249.200.219 | 橙云 |
 
-NS 已从 Dynadot 切到 `crystal.ns.cloudflare.com` / `hank.ns.cloudflare.com`，zone 已 active。
+跳转域的 A 记录不能删——301 是 NPM 在源站发出的，DNS 得先能解析到服务器。
 
-## NPM 配置（已建好）
+## NPM 配置
 
-- **Proxy Host #3**：`axin.group` → `172.17.0.1:4003`，Force SSL、HTTP/2、Block Exploits、Websockets
-- **Redirection Host #1**：`www.axin.group` → `axin.group`，301，Preserve Path
-- **证书 #3**：Let's Encrypt，DNS-01（Cloudflare），一张覆盖 `axin.group` + `www.axin.group`，NPM 自动续期
+| 类型 | id | 域名 | 目标 | 证书 |
+|------|----|------|------|------|
+| Proxy Host | 4 | `axingroup.com` | `172.17.0.1:4003` | #4 |
+| Redirection Host | 2 | `www.axingroup.com` | `axingroup.com` 301 | #4 |
+| Redirection Host | 3 | `axin.group` | `axingroup.com` 301 | #3 |
+| Redirection Host | 1 | `www.axin.group` | `axingroup.com` 301 | #3 |
+
+全部 Force SSL + HTTP/2 + Block Exploits，跳转均 Preserve Path。
+
+- **证书 #3**：`axin.group` + `www.axin.group`
+- **证书 #4**：`axingroup.com` + `www.axingroup.com`
+
+两张都是 Let's Encrypt / DNS-01（Cloudflare），NPM 自动续期。
+**证书 #3 不能删**，跳转域也要有合法证书才能完成 https 握手、进而发出 301。
 
 ## 更新站点
 
@@ -99,7 +124,18 @@ FORMSPREE_ENDPOINT=https://formspree.io/f/mppagwqe
 
 ## 待办
 
+### 主域切换后的 SEO 收尾
+
+301 已经就位，搜索引擎会自行迁移，但下面几件事能加快且避免统计断层：
+
+- Google Search Console 里把 `axingroup.com` 加为新资源并提交 sitemap；
+  老的 `axin.group` 资源保留别删，用「地址变更」工具通知迁移
+- 检查外部引用（名片、邮件签名、社交主页、已投放物料）里的 `axin.group`，逐步换成新域
+- `axin.group` 的 DNS 记录和证书 #3 **长期保留**，跳转要一直有效
+
 ### 确认 Cloudflare SSL 模式是 Full (strict)
+
+注意：`axingroup.com` 是**新 zone**，SSL 模式要单独确认，不会继承 axin.group 的设置。
 
 源站现在有合法的 Let's Encrypt 证书，可以安全地开 Full (strict)。
 线上实测没有重定向循环，说明当前至少是 Full 而非 Flexible，但 Full 不校验源站证书。
