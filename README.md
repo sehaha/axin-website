@@ -32,6 +32,19 @@ cp .env.example .env.local
 
 ## 版本记录
 
+### v5.1.1 — 2026-08-24
+
+为提交 Google Search Console 优化 sitemap：
+
+- **`lastModified` 由 `new Date()` 改为常量 `CONTENT_UPDATED_AT`**。
+  原写法在构建时求值，等于每次重新部署 lastmod 都变，内容没改也报「刚更新」；
+  爬虫核对不上就会逐渐忽略这个字段，反而失去加快收录的作用。**改页面内容时记得手动更新这个常量。**
+- `changeFrequency` 由 `weekly` 改为 `monthly`——单页企业站不会周更，如实申报
+- sitemap 里的 URL 写法与 `layout.tsx` 输出的 canonical 对齐（根域不带尾斜杠），
+  避免 GSC 里出现两种形态
+
+提交给 GSC 的地址：`https://axingroup.com/sitemap.xml`
+
 ### v5.1.0 — 2026-08-24
 
 生态板块四家实体挂上各自站点的链接，全部新标签页打开。
