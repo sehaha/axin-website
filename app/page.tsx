@@ -2,6 +2,7 @@ import { ContactForm } from "@/components/ContactForm";
 import { Navigation } from "@/components/Navigation";
 import { ParticleField } from "@/components/ParticleField";
 import { ScrollReveal } from "@/components/ScrollReveal";
+import { entities, site } from "@/lib/site";
 
 const engines = [
   ["01", "Technology", "Embodied AI · Intelligent Systems · Applications"],
@@ -10,35 +11,6 @@ const engines = [
 ] as const;
 
 const stages = ["Learn", "Build", "Deploy", "Commercialize"];
-
-// 生态板块的四家实体，各自链到独立站点。eduready.ai 的 www 会 301 到根域，
-// 这里直接写最终地址，省掉一次跳转。
-const units = [
-  {
-    position: "unit-a",
-    category: "TECHNOLOGY",
-    name: "AXIN Intelligent Systems",
-    href: "https://eduready.ai/",
-  },
-  {
-    position: "unit-b",
-    category: "GLOBAL SERVICES",
-    name: "YUNO Family Office",
-    href: "https://www.yunofamilyoffice.com/",
-  },
-  {
-    position: "unit-c",
-    category: "CAPITAL",
-    name: "METO Capital",
-    href: "https://www.metocapital.com/",
-  },
-  {
-    position: "unit-d",
-    category: "EDUCATION & TALENT",
-    name: "Aili Academy",
-    href: "https://www.ailiacademy.com/",
-  },
-] as const;
 
 export default function Home() {
   return (
@@ -55,10 +27,16 @@ export default function Home() {
             <span>AXIN INTERNATIONAL GROUP</span>
             <span>TECHNOLOGY · CAPITAL · GLOBAL SERVICES</span>
           </div>
-          <div className="hero-brand" aria-label="AXIN">
+          <div className="hero-brand">
             <span className="brand-back" aria-hidden="true">AXIN</span>
             <span className="brand-mid" aria-hidden="true">AXIN</span>
-            <h1>AXIN</h1>
+            {/* 视觉上仍是 AXIN 字标；补一段仅供屏幕阅读器和爬虫的全称，
+                否则整页最重要的标题只有四个字母，信息量太少。
+                这不是隐藏关键词——它和 logo 表达的是同一件事。 */}
+            <h1>
+              AXIN
+              <span className="visually-hidden"> International Group — {site.tagline}</span>
+            </h1>
             <span className="brand-shine" aria-hidden="true">AXIN</span>
           </div>
           <div className="hero-bottom">
@@ -136,7 +114,7 @@ export default function Home() {
             <div className="ring ring-one" aria-hidden="true" />
             <div className="ring ring-two" aria-hidden="true" />
             <div className="ecosystem-center">AXIN</div>
-            {units.map(unit => (
+            {entities.map(unit => (
               <a
                 key={unit.position}
                 className={`unit ${unit.position}`}
